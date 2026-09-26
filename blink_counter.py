@@ -7,6 +7,10 @@ cap = cv2.VideoCapture(0)
 
 detector = FaceMeshDetector(maxFaces =1)
 
+#based on these points on the face we can find the blinking
+
+idList = [22,23,24]
+
 while True:
 
     # if cap.get(cv2.CAP_PROP_POS_FRAMES) == cap.get(cv2.CAP_PROP_FRAME_COUNT):
@@ -14,7 +18,12 @@ while True:
 
 
     success, img = cap.read()
-    img, faces  =detector.findFaceMesh(img)
+    img, faces  =detector.findFaceMesh(img, draw = False)
+
+    if faces:
+        face = faces[0]
+        for id in idList:
+            cv2.circle(img,face[id],5,(255,0,255), cv2.FILLED)
 
     cv2.imshow("BLINK&SMILE",img)
     cv2.waitKey(1)
