@@ -1,6 +1,7 @@
 import cv2
 import cvzone
 from cvzone.FaceMeshModule import FaceMeshDetector
+from cvzone.PlotModule import LivePlot
 
 cap = cv2.VideoCapture(0)
 
@@ -24,6 +25,21 @@ while True:
         face = faces[0]
         for id in idList:
             cv2.circle(img,face[id],4,(255,0,255), cv2.FILLED)
+
+
+        leftUpper = face[159]
+        leftDowner = face[23]
+        leftLefty = face[130]
+        leftRight = face[243]
+
+        vertLen, _= detector.findDistance(leftUpper,leftDowner)
+        horLen, _= detector.findDistance(leftLefty,leftRight)
+        cv2.line(img,leftUpper,leftDowner, (0,200,0),3)
+        cv2.line(img,leftLefty,leftRight, (0,200,0),3)
+        print(int((vertLen/horLen)*100)) # we need thew ratio instead of the ruglar difference since the difference changes as we move back and forward!
+
+
+        
 
     cv2.imshow("BLINK&SMILE",img)
     cv2.waitKey(1)
