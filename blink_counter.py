@@ -54,15 +54,15 @@ while True:
         # PHASE 1: AUTO-CALIBRATION ( ~3 Seconds)
         if calibrating:
             calibrationList.append(ratio)
-            cvzone.putTextRect(img, "CALIBRATING... STARE AT CAMERA", (50, 100), colorR=(0, 0, 255))
+            cvzone.putTextRect(img, "STARE AT CAMERA", (50, 100), colorR=(0, 0, 255))
             
-            # After collecting 60 frames, calculate the user's specific baseline
+            # after collecting 60 frames, calculate the user's specific baseline
             if len(calibrationList) >= 360:
                 baselineRatio = sum(calibrationList) / len(calibrationList)
                 
-                # Set dynamic thresholds based on the baseline
-                blinkThreshold = baselineRatio - 6  # Triggers when ratio drops 6 points below resting
-                openThreshold = baselineRatio - 2   # Triggers when eyes return near resting
+                # sfet dynamic thresholds based on the baseline
+                blinkThreshold = baselineRatio - 6  # triggers when ratio drops 6 points below resting
+                openThreshold = baselineRatio - 2   # triggers when eyes return near resting
                 calibrating = False
                 
             imgPlot = plotY.update(ratio)
@@ -81,7 +81,7 @@ while True:
                 framesOpen = 0
                 color = (0, 255, 0)
                 
-                # Delete the word IMMEDIATELY after holding for 40 frames
+                # dlete the word IMMEDIATELY after holding for 40 frames
                 if framesClosed == 40:
                     currentWord = ""
                     quickBlinkCount = 0
@@ -91,7 +91,7 @@ while True:
                 color = (255, 0, 255)
                 
                 if framesClosed > 0:
-                    # Only count as a quick blink if it was shorter than the 40-frame delete hold
+                    # only count as a quick blink if it was shorter than the 40-frame delete hold
                     if framesClosed < 40: 
                         quickBlinkCount += 1
                         
