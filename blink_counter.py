@@ -9,7 +9,7 @@ detector = FaceMeshDetector(maxFaces =1)
 
 #based on these points on the face we can find the blinking
 
-idList = [22,23,24]
+idList = [22,23,24,26,110,157,158,159,160,161,130,243]
 
 while True:
 
@@ -23,7 +23,7 @@ while True:
     if faces:
         face = faces[0]
         for id in idList:
-            cv2.circle(img,face[id],5,(255,0,255), cv2.FILLED)
+            cv2.circle(img,face[id],4,(255,0,255), cv2.FILLED)
 
     cv2.imshow("BLINK&SMILE",img)
     cv2.waitKey(1)
