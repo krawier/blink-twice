@@ -17,6 +17,8 @@ idList = [22,23,24,26,110,157,158,159,160,161,130,243]
 
 ratioList = []
 
+blinkCnt = 0
+
 while True:
 
     # if cap.get(cv2.CAP_PROP_POS_FRAMES) == cap.get(cv2.CAP_PROP_FRAME_COUNT):
@@ -46,11 +48,14 @@ while True:
         ratio = int(((vertLen/horLen)*100))
 
         ratioList.append(ratio)
-        if len(ratioList) > 5:
+        if len(ratioList) > 3:
             ratioList.pop(0)
 
         ratioAvg = sum(ratioList)/len(ratioList)
 
+        if ratioAvg<35:
+            blinkCnt += 1
+        cvzone.putTextRect(img,f"Blink Count: {blinkCnt}",{50,100})
 
         imgPlot = plotY.update(ratioAvg)
         #cv2.imshow("PLOT",imgPlot)
