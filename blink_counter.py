@@ -18,6 +18,8 @@ idList = [22,23,24,26,110,157,158,159,160,161,130,243]
 ratioList = []
 
 blinkCnt = 0
+counter = 0
+
 
 while True:
 
@@ -53,8 +55,14 @@ while True:
 
         ratioAvg = sum(ratioList)/len(ratioList)
 
-        if ratioAvg<35:
+        if ratioAvg<30 and counter==0:
             blinkCnt += 1
+            counter = 1
+        if counter != 0:
+            counter += 1
+            if counter > 15:
+                counter = 0
+
         cvzone.putTextRect(img,f"Blink Count: {blinkCnt}",{50,100})
 
         imgPlot = plotY.update(ratioAvg)
