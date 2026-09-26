@@ -8,9 +8,14 @@ cap = cv2.VideoCapture(0)
 
 detector = FaceMeshDetector(maxFaces =1)
 
-#based on these points on the face we can find the blinking
+width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+plotY = LivePlot(width, height, [20, 50], invert=True)
 
+#based on these points on the face we can find the blinking
 idList = [22,23,24,26,110,157,158,159,160,161,130,243]
+
+ratioList = []
 
 while True:
 
@@ -36,10 +41,22 @@ while True:
         horLen, _= detector.findDistance(leftLefty,leftRight)
         cv2.line(img,leftUpper,leftDowner, (0,200,0),3)
         cv2.line(img,leftLefty,leftRight, (0,200,0),3)
-        print(int((vertLen/horLen)*100)) # we need thew ratio instead of the ruglar difference since the difference changes as we move back and forward!
-
-
+        # we need thew ratio instead of the ruglar difference since the difference changes as we move back and forward!
         
+        ratio = int(((vertLen/horLen)*100))
 
-    cv2.imshow("BLINK&SMILE",img)
+        ratioList.append(ratio)
+        if len(ratioList) > 5:
+            ratioList.pop(0)
+
+        ratioAvg = sum(ratioList)/len(ratioList)
+
+
+        imgPlot = plotY.update(ratioAvg)
+        #cv2.imshow("PLOT",imgPlot)
+        imgStack = cvzone.stackImages([img, imgPlot], 2, 0.5) 
+    else:
+        imgStack = cvzone.stackImages([img, img], 2, 0.5)
+
+    cv2.imshow("BLINK&SMILE",imgStack)
     cv2.waitKey(1)
