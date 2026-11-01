@@ -31,6 +31,8 @@ Instead of typing every letter of the alphabet, the program only offers letters 
 
    python blink_counter.py
 
+Press `q` to quit.
+
 The window shows three panels: **camera feed**, **control panel** (state, current prefix, offered letter, dwell progress bar, number of matching words) and **live eye-ratio graph**.
 
 ## How to use
@@ -56,9 +58,12 @@ Blinks lasting between ~1 s and ~2 s in `SCANNING` mode are ignored – this pro
 2. Blink briefly to move to the next letter. Each letter is spoken aloud; the panel also shows which letter comes next. The list wraps around after the last letter.
 3. When you hear the letter you want, simply **keep your eyes open**. After ~2 s the program says **"Wybrano"** and adds the letter to the prefix.
 4. The list of letters shrinks to those that continue a matching word. When only one word remains, just wait – each remaining letter is selected automatically after ~2 s.
-5. When the full word is spelled, the program shows **SENDING...**, says **"Wysłano komunikat"** and returns to `IDLE`. The message is currently printed to the console as `--- SENT TO DASHBOARD: <WORD> ---`.
+5. If the letters typed so far already form a complete word, but longer words also match (e.g. **NIE** / **NIEWYGODNIE**), a **WYSLIJ** option appears first – wait to send the shorter word, or blink to continue typing the longer one.
+6. When the message is complete, the program says **"Wysłano komunikat"** and returns to `IDLE`. The message is currently printed to the console as `--- SENT TO DASHBOARD: <WORD> ---`.
 
 **Example – "WODA":** start typing → blink until you hear *W* → wait → the remaining letters *O*, *D*, *A* are the only options, so just keep waiting → message sent.
+
+**Example – "NIE":** start typing → blink until you hear *N* → wait → *I* and *E* are selected automatically → **WYSLIJ** is offered → wait → message sent.
 
 ### 4. Available words
 | Category | Words |
@@ -69,7 +74,7 @@ Blinks lasting between ~1 s and ~2 s in `SCANNING` mode are ignored – this pro
 | Environment | ŚWIATŁO, CICHY, GŁOŚNO, ZAMKNIJ, OTWÓRZ |
 | Communication / personal | TAK, NIE, DZIĘKUJĘ, TELEFON, OKULARY, RODZINA |
 
-The dictionary can be edited in the `medical_dictionary` list in the source code.
+The dictionary can be edited in the `medical_dictionary` list in the source code. Words that are the beginning of other words are handled automatically with the **WYSLIJ** option.
 
 ## Best practices for camera tracking
 - **Distance:** sit slightly further from the camera so your whole head, including chin and jawline, is visible – FaceMesh needs it to anchor the mesh.
@@ -78,8 +83,6 @@ The dictionary can be edited in the `medical_dictionary` list in the source code
 - **Recalibrate** (restart the program) if you change position, distance or lighting significantly.
 
 ## Known limitations
-- The word **NIE** cannot be sent, because it is the beginning of **NIEWYGODNIE** – after typing N-I-E the program only offers *W*.
 - Polish characters (Ą, Ę, Ó, Ł, Ś…) are not rendered correctly by OpenCV and appear as `?` on screen; voice feedback is not affected.
 - All timings depend on the camera's frame rate.
-- There is no exit key – close the program with `Ctrl+C` in the terminal.
 - Messages are only printed to the console; sending them to an external dashboard is not implemented yet.
