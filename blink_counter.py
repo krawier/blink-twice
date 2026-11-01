@@ -2,6 +2,10 @@ import cv2
 import cvzone
 from cvzone.FaceMeshModule import FaceMeshDetector
 from cvzone.PlotModule import LivePlot
+import requests
+import threading
+import pyttsx3
+import numpy as np
 
 cap = cv2.VideoCapture(0)
 detector = FaceMeshDetector(maxFaces=1)
@@ -13,30 +17,77 @@ plotY = LivePlot(width, height, [20, 50], invert=True)
 idList = [22, 23, 24, 26, 110, 157, 158, 159, 160, 161, 130, 243]
 color = (255, 0, 255)
 
-# --- Calibration Variables ---
+# --- Dictionary & State Variables ---
+medical_dictionary = [
+    # --- Nagłe ---
+    "BÓL", "DUSZNO", "PANIKA", "POMOC", "SSAK",
+    "PIELĘGNIARKA", "LEKARZ", "LEKI", "KROPLÓWKA",
+    
+    # --- Potrzeby fizjologiczne ---
+    "WODA", "JEDZENIE", "TOALETA", "MOKRO", "ZIMNO", "GORĄCO", 
+    
+    # --- Komfort  ---
+    "PODUSZKA", "KOC", "SIEDZIEĆ", "LEŻEĆ", "OBRÓCIĆ", 
+    "NIEWYGODNIE", "SWĘDZI", "SKURCZ",
+    
+    # --- Otoczenie (Environment) ---
+    "ŚWIATŁO", "CICHY", "GŁOŚNO", "ZAMKNIJ", "OTWÓRZ", 
+    
+    # --- Komunikacja / Prywatne ---
+    "TAK", "NIE", "DZIĘKUJĘ", "TELEFON", "OKULARY", "RODZINA"
+]
+
+available_words = medical_dictionary.copy()
+current_prefix = ""
+
+system_state = "IDLE"  
+current_letter_index = 0
+possible_next_letters = []
+
+# --- Timing Variables ---
 calibrating = True
 calibrationList = []
 baselineRatio = 0
 blinkThreshold = 0
 openThreshold = 0
 
-# --- Keyboard Variables ---
 ratioList = []
 framesClosed = 0
-framesOpen = 0
-quickBlinkCount = 0
-currentWord = ""
+framesDwell = 0  
+DWELL_LIMIT = 60 
+
+def get_possible_letters(prefix, words):
+    letters = set()
+    for w in words:
+        if len(w) > len(prefix):
+            letters.add(w[len(prefix)])
+    return sorted(list(letters))
+
+def speak_async(text):
+    def run_tts():
+        engine = pyttsx3.init()
+        voices = engine.getProperty('voices')
+        for voice in voices:
+            if 'Polish' in voice.name or 'PL' in voice.id:
+                engine.setProperty('voice', voice.id)
+                break
+        engine.say(text)
+        engine.runAndWait()
+        
+    threading.Thread(target=run_tts, daemon=True).start()
 
 while True:
     success, img = cap.read()
     img, faces = detector.findFaceMesh(img, draw=False)
+    
+    # Create a blank black canvas for the UI panel
+    imgUI = np.zeros((height, width, 3), np.uint8)
 
     if faces:
         face = faces[0]
         for id in idList:
             cv2.circle(img, face[id], 3, color, cv2.FILLED)
 
-        # Distance calculations
         leftLefty = face[130]
         leftRight = face[243]
         leftUp1 = face[159]
@@ -51,23 +102,24 @@ while True:
         vertLen = (vertLen1 + vertLen2) / 2
         ratio = int(((vertLen / horLen) * 100))
 
-        # PHASE 1: AUTO-CALIBRATION ( ~3 Seconds)
+        # ==========================================
+        # PHASE 1: AUTO-CALIBRATION
+        # ==========================================
         if calibrating:
             calibrationList.append(ratio)
-            cvzone.putTextRect(img, "STARE AT CAMERA", (50, 100), colorR=(0, 0, 255))
+            cvzone.putTextRect(imgUI, "STARE AT CAMERA", (50, 100), colorR=(0, 0, 255))
             
-            # after collecting 60 frames, calculate the user's specific baseline
             if len(calibrationList) >= 360:
                 baselineRatio = sum(calibrationList) / len(calibrationList)
-                
-                # sfet dynamic thresholds based on the baseline
-                blinkThreshold = baselineRatio - 6  # triggers when ratio drops 6 points below resting
-                openThreshold = baselineRatio - 2   # triggers when eyes return near resting
+                blinkThreshold = baselineRatio - 6  
+                openThreshold = baselineRatio - 2   
                 calibrating = False
                 
             imgPlot = plotY.update(ratio)
 
-        # PHASE 2: ACTIVE TRACKING & TYPING
+        # ==========================================
+        # PHASE 2: DWELL TIME STATE MACHINE
+        # ==========================================
         else:
             ratioList.append(ratio)
             if len(ratioList) > 5:
@@ -75,49 +127,92 @@ while True:
 
             ratioAvg = sum(ratioList) / len(ratioList)
 
-            # --- UPDATED LOGIC ---
             if ratioAvg < blinkThreshold:
                 framesClosed += 1
-                framesOpen = 0
+                framesDwell = 0 
                 color = (0, 255, 0)
-                
-                # dlete the word IMMEDIATELY after holding for 40 frames
-                if framesClosed == 40:
-                    currentWord = ""
-                    quickBlinkCount = 0
-                    color = (0, 0, 255) # Turns RED to let you know it successfully deleted
-                
-            elif ratioAvg > openThreshold:
+            else:
                 color = (255, 0, 255)
                 
                 if framesClosed > 0:
-                    # only count as a quick blink if it was shorter than the 40-frame delete hold
-                    if framesClosed < 40: 
-                        quickBlinkCount += 1
-                        
-                    framesClosed = 0 
-                    
-                framesOpen += 1
-                
-                if framesOpen > 30 and quickBlinkCount > 0:
-                    if quickBlinkCount == 1:
-                        currentWord += " " 
-                    elif quickBlinkCount >= 2:
-                        letter = chr(63 + quickBlinkCount)
-                        if letter.isalpha() and letter.isupper():
-                            currentWord += letter
+                    if system_state == "IDLE":
+                        if framesClosed >= 75: 
+                            system_state = "SCANNING"
+                            current_prefix = ""
+                            available_words = medical_dictionary.copy()
+                            possible_next_letters = get_possible_letters(current_prefix, available_words)
+                            current_letter_index = 0
+                            speak_async(possible_next_letters[0]) 
                             
-                    quickBlinkCount = 0
+                    elif system_state == "SCANNING":
+                        if 3 <= framesClosed < 30: 
+                            current_letter_index += 1
+                            if current_letter_index >= len(possible_next_letters):
+                                current_letter_index = 0
+                            speak_async(possible_next_letters[current_letter_index])
+                            
+                        elif framesClosed >= 60: 
+                            system_state = "IDLE"
+                            current_prefix = ""
+                            speak_async("Anulowano") 
 
-            cvzone.putTextRect(img, f"Blinks: {quickBlinkCount}", (50, 50), scale=2, thickness=2, colorR=color)
-            cvzone.putTextRect(img, f"Word: {currentWord}", (50, 120), scale=3, thickness=3, colorR=(0, 0, 0))
-            cvzone.putTextRect(img, f"Base: {int(baselineRatio)} | Blink: {int(blinkThreshold)}", (50, height - 50), scale=2, colorR=(100, 100, 100))
+                    framesClosed = 0 
+                
+                if system_state == "SCANNING":
+                    framesDwell += 1
+                    
+                    if framesDwell >= DWELL_LIMIT:
+                        selected_letter = possible_next_letters[current_letter_index]
+                        current_prefix += selected_letter
+                        speak_async("Wybrano")
+                        
+                        available_words = [w for w in available_words if w.startswith(current_prefix)]
+                        
+                        if len(available_words) == 1 and available_words[0] == current_prefix:
+                            cvzone.putTextRect(imgUI, "SENDING...", (width//2 - 100, height//2), scale=3, colorR=(0, 200, 0))
+                            cv2.imshow("BLINK&SMILE", img) # Temporarily show just the camera
+                            cv2.waitKey(500)
+                            
+                            print(f"--- SENT TO DASHBOARD: {current_prefix} ---")
+                            speak_async("Wysłano komunikat")
+                            
+                            system_state = "IDLE"
+                            current_prefix = ""
+                            available_words = medical_dictionary.copy()
+                        else:
+                            possible_next_letters = get_possible_letters(current_prefix, available_words)
+                            current_letter_index = 0
+                            speak_async(possible_next_letters[0])
+                            
+                        framesDwell = 0 
 
+            # ==========================================
+            # UI VISUALS (Now drawn on imgUI instead of img)
+            # ==========================================
+            cvzone.putTextRect(imgUI, f"State: {system_state}", (50, 50), scale=2, thickness=2, colorR=color)
+            
+            if system_state == "SCANNING":
+                cvzone.putTextRect(imgUI, f"Prefix: {current_prefix}", (50, 120), scale=2, colorR=(0, 0, 0))
+                
+                if possible_next_letters:
+                    cvzone.putTextRect(imgUI, f"Letter: {possible_next_letters[current_letter_index]}", (50, 200), scale=4, thickness=4, colorR=(200, 0, 0))
+                    
+                    next_idx = (current_letter_index + 1) % len(possible_next_letters)
+                    if len(possible_next_letters) > 1:
+                        cvzone.putTextRect(imgUI, f"Next -> {possible_next_letters[next_idx]}", (50, 310), scale=2, colorR=(150, 150, 150))
+                    
+                    bar_width = int((framesDwell / DWELL_LIMIT) * 200)
+                    cv2.rectangle(imgUI, (50, 250), (50 + bar_width, 270), (0, 255, 0), cv2.FILLED)
+                    cv2.rectangle(imgUI, (50, 250), (250, 270), (255, 255, 255), 2) 
+            
+            cvzone.putTextRect(imgUI, f"Matches: {len(available_words)}", (50, height - 50), scale=2, colorR=(100, 100, 100))
             imgPlot = plotY.update(ratioAvg)
 
-        imgStack = cvzone.stackImages([img, imgPlot], 2, 0.5) 
+        # Stack into 3 columns: Camera, UI Canvas, Graph
+        imgStack = cvzone.stackImages([img, imgUI, imgPlot], 3, 0.7) 
     else:
-        imgStack = cvzone.stackImages([img, img], 2, 0.5)
+        # Maintain layout even if face tracking drops
+        imgStack = cvzone.stackImages([img, imgUI, img], 3, 0.7)
 
     cv2.imshow("BLINK&SMILE", imgStack)
     cv2.waitKey(1)
